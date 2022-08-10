@@ -28,7 +28,7 @@ FirebaseJson json;
 
 const char *mqtt_broker = "broker.hivemq.com";
 const char *mqtt_username = "mikiko";
-const char *mqtt_password = "public";
+const char *mqtt_password = "mikiko";
 const int mqtt_port = 1883;
 
 #define LENGTH(x) (strlen(x) + 1) // length of char string
