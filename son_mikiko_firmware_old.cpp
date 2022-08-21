@@ -8,10 +8,9 @@
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
 #include <PubSubClient.h>
-#include <time.h>
-#include <sys/time.h>
-#include "CronAlarms.h"
+#include <NTPClient.h>
 #include "EEPROM.h"
+// #include <LittleFS.h>
 
 #define FIREBASE_PROJECT_ID "mikiko-c5ca4"
 #define STORAGE_BUCKET_ID "gs://mikiko-c5ca4.appspot.com"
@@ -42,14 +41,67 @@ FirebaseJson json;
 
 Ticker ticker;
 WiFiUDP udp;
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 DynamicJsonDocument schedule(2048);
 
-time_t rawtime;
-struct tm *timeinfo;
+String uniq_username = String("MIKIKO" + WiFi.macAddress());
+
+const char *mqtt_broker = "broker.hivemq.com";
+const char *mqtt_username = uniq_username.c_str();
+const char *mqtt_password = "mikiko";
+const int mqtt_port = 1883;
+
+String ssid; // string variable to store ssid
+String pss;  // string variable to store password
+String MACADD = WiFi.macAddress();
+
+String topic1;
+String topic2;
+String topic3;
+String topic4;
+String fwVersion_topic;
+String fwUpdate_topic;
+String fwRespone_topic;
+String schedule_topic;
+String documentPath;
+String hour;
+String minutes;
+String sendTime;
+// const char *ssid_path = "/ssid.txt";
+// const char *pass_path = "/pass.txt";
+
+int days;
+
+unsigned long int duration1;
+unsigned long int duration2;
+unsigned long int duration3;
+unsigned long int duration4;
+
+unsigned long int millis_duration1;
+unsigned long int millis_duration2;
+unsigned long int millis_duration3;
+unsigned long int millis_duration4;
+unsigned long int current_millis;
+
+bool timmerCheck1 = false;
+bool timmerCheck2 = false;
+bool timmerCheck3 = false;
+bool timmerCheck4 = false;
+
+bool schedule_check1 = true;
+bool schedule_check2 = true;
+bool schedule_check3 = true;
+bool schedule_check4 = true;
+
+bool wifi_state = false;
+
+char udpbuf[255];
+char replyPacket[] = "SON:4CH:MIKIKO";
 
 OneButton btn1 = OneButton(
     0,
@@ -68,82 +120,7 @@ OneButton btn4 = OneButton(
     true,
     true);
 
-String uniq_username = String("MIKIKO" + WiFi.macAddress());
-
-const char *mqtt_broker = "broker.hivemq.com";
-const char *mqtt_username = uniq_username.c_str();
-const char *mqtt_password = "mikiko";
-const int mqtt_port = 1883;
-
-const char *ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 0;
-const int daylightOffset_sec = 8 * 3600;
-
-String ssid; // string variable to store ssid
-String pss;  // string variable to store password
-String MACADD = WiFi.macAddress();
-
-String topic1;
-String topic2;
-String topic3;
-String topic4;
-String fwVersion_topic;
-String fwUpdate_topic;
-String fwRespone_topic;
-String schedule_topic;
-String documentPath;
-
-int schedule_duration[10];
-int schedule_pin_out[10];
-
-bool wifi_state = false;
-
-char udpbuf[255];
-char replyPacket[] = "SON:4CH:MIKIKO";
-
 static void wifi_led();
-
-void out1_on()
-{
-  digitalWrite(out1, HIGH);
-}
-
-void out1_off()
-{
-  digitalWrite(out1, LOW);
-}
-
-void out2_on()
-{
-  digitalWrite(out2, HIGH);
-}
-
-void out2_off()
-{
-  digitalWrite(out2, LOW);
-}
-
-void out3_on()
-{
-  digitalWrite(out3, HIGH);
-}
-
-void out3_off()
-{
-  digitalWrite(out3, LOW);
-}
-
-void out4_on()
-{
-  digitalWrite(out4, HIGH);
-}
-
-void out4_off()
-{
-  digitalWrite(out4, LOW);
-}
-
-void schedule_check();
 
 String getValue(String data, char separator, int index)
 {
@@ -342,18 +319,8 @@ void mqtt_process(char *topic, byte *payload)
     if (Firebase.Firestore.getDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str(), "schedule"))
     {
       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
-
-      // for (int j = 0; j < schedule["schedule"].size(); j++)
-      // {
-      //   Cron.free(schedule_id[j]);
-
-      //   schedule_id[j] = dtINVALID_ALARM_ID;
-      // }
-
       deserializeJson(schedule, fbdo.payload());
       schedule["schedule"] = schedule["fields"]["schedule"]["arrayValue"]["values"];
-
-      schedule_check();
     }
     else
     {
@@ -387,27 +354,38 @@ static void wifi_led()
 
 void btnLongPress()
 {
-  writeStringToFlash("", 0);
-  writeStringToFlash("", 40);
+  writeStringToFlash("", 0);  // storing ssid at address 0
+  writeStringToFlash("", 40); // storing pss at address 40
   ESP.restart();
 }
 
-bool getLocalTime(struct tm *info, uint32_t ms = 5000)
-{
-  uint32_t start = millis();
-  time_t now;
-  while ((millis() - start) <= ms)
-  {
-    time(&now);
-    localtime_r(&now, info);
-    if (info->tm_year > 1990)
-    {
-      return true;
-    }
-    delay(10);
-  }
-  return false;
-}
+// String readData(const char *path)
+// {
+//   File file = LittleFS.open(path, "r");
+
+//   String return_data;
+//   while (file.available())
+//   {
+//     return_data = file.readStringUntil('\n');
+
+//     break;
+//   }
+
+//   file.close();
+
+//   return return_data;
+// }
+
+// void writeData(const char *data, const char *path)
+// {
+//   // Open the file
+//   File file = LittleFS.open(path, "w");
+//   // Write to the file
+//   file.print(data);
+//   delay(1);
+//   // Close the file
+//   file.close();
+// }
 
 void setup()
 {
@@ -416,11 +394,20 @@ void setup()
 
   EEPROM.begin(EEPROM_SIZE);
 
+  // if (!LittleFS.begin())
+  // {
+  //   Serial.println("An Error has occurred while mounting LittleFS");
+  // }
+  // else
+  // {
+  //   ssid = readData(ssid_path);
+  //   pss = readData(pass_path);
+  // }
+
   pinMode(out1, OUTPUT);
   pinMode(out2, OUTPUT);
   pinMode(out3, OUTPUT);
   pinMode(out4, OUTPUT);
-  pinMode(LED_BUILTIN, OUTPUT);
   pinMode(WIFI_LED, OUTPUT);
 
   btn1.attachClick(handleClick1);
@@ -457,21 +444,12 @@ void setup()
   Serial.print("psss = ");
   Serial.println(pss);
 
+  // writeStringToFlash("", 0);
+  // writeStringToFlash("", 40);
+
   ticker.attach(0.2, wifi_led);
 
   Serial.println(MACADD);
-
-  // WiFi.begin("Wifi saya", "1sampai9");
-
-  // while (WiFi.status() != WL_CONNECTED)
-  // {
-  //   delay(500);
-  //   Serial.print(".");
-  // }
-  // Serial.println("CONNECTED to WIFI");
-
-  // writeStringToFlash("", 0);
-  // writeStringToFlash("", 40);
 
   if (ssid.length() > 0 && pss.length() > 0)
   {
@@ -547,26 +525,21 @@ void setup()
     }
 
     ssid = WiFi.SSID();
+    // ssid = String(ssid + "\n");
     pss = WiFi.psk();
+    // pss = String(pss + "\n");
 
-    writeStringToFlash(ssid.c_str(), 0);
-    writeStringToFlash(pss.c_str(), 40);
+    writeStringToFlash(ssid.c_str(), 0); // storing ssid at address 0
+    writeStringToFlash(pss.c_str(), 40); // storing pss at address 40
+
+    // writeData(ssid.c_str(), ssid_path);
+    // writeData(pss.c_str(), pass_path);
   }
 
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
 
   wifi_state = true;
-
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-
-  struct tm tm_newtime;
-
-  while (getLocalTime(&tm_newtime))
-  {
-    Serial.print(".");
-    delay(1000);
-  }
 
   client.setServer(mqtt_broker, mqtt_port);
   client.setCallback(callback);
@@ -578,17 +551,6 @@ void setup()
     Serial.printf("The client %s connects to the public mqtt broker\n", client_id.c_str());
     if (client.connect(client_id.c_str(), mqtt_username, mqtt_password, MACADD.c_str(), 2, true, "false"))
     {
-      client.subscribe(topic1.c_str());
-      client.subscribe(topic2.c_str());
-      client.subscribe(topic3.c_str());
-      client.subscribe(topic4.c_str());
-
-      client.subscribe(schedule_topic.c_str());
-
-      client.subscribe(fwUpdate_topic.c_str());
-      client.publish(fwVersion_topic.c_str(), FIRMWARE_VERSION, true);
-
-      client.publish(MACADD.c_str(), "true", true);
     }
     else
     {
@@ -598,8 +560,24 @@ void setup()
     }
   }
 
+  client.subscribe(topic1.c_str());
+  client.subscribe(topic2.c_str());
+  client.subscribe(topic3.c_str());
+  client.subscribe(topic4.c_str());
+
+  client.subscribe(schedule_topic.c_str());
+
+  client.subscribe(fwUpdate_topic.c_str());
+  client.publish(fwVersion_topic.c_str(), FIRMWARE_VERSION, true);
+
+  client.publish(MACADD.c_str(), "true", true);
+
   config.api_key = API_KEY;
   config.database_url = DATABASE_URL;
+
+  timeClient.begin();
+  timeClient.setTimeOffset(8 * 3600);
+  timeClient.forceUpdate();
 
   auth.user.email = DEVICE_EMAIL;
   auth.user.password = DEVICE_PASS;
@@ -619,114 +597,90 @@ void setup()
 
 void schedule_check()
 {
-
-  // int index = schedule["schedule"].size() - 1;
-  // int selisih = schedule["schedule"].size() - Cron.count();
   for (int j = 0; j < schedule["schedule"].size(); j++)
   {
-    String cron_string = schedule["schedule"][j]["mapValue"]["fields"]["cron"]["stringValue"];
     String output = schedule["schedule"][j]["mapValue"]["fields"]["output"]["stringValue"];
-    bool repeat = schedule["schedule"][j]["mapValue"]["fields"]["repeat"]["booleanValue"];
-    bool status = schedule["schedule"][j]["mapValue"]["fields"]["status"]["booleanValue"];
-    bool state = schedule["schedule"][j]["mapValue"]["fields"]["state"]["booleanValue"];
+    if (output == "out1")
+    {
+      if (timmerCheck1 == false)
+      {
+        bool status = schedule["schedule"][j]["mapValue"]["fields"]["status"]["booleanValue"];
+        String time = schedule["schedule"][j]["mapValue"]["fields"]["time"]["stringValue"];
+        uint8_t day = schedule["schedule"][j]["mapValue"]["fields"]["every"]["integerValue"];
+        if (time == sendTime && status == true && days == day)
+        {
+          duration1 = schedule["schedule"][j]["mapValue"]["fields"]["duration"]["integerValue"];
 
-    if (output == "out1" && status == true)
-    {
-      if (repeat == true)
-      {
-        if (state == true)
-        {
-          Cron.create(cron_string.c_str(), out1_on, true);
+          timmerCheck1 = true;
         }
-        else
+        else if (time == sendTime && status == true && day > 7)
         {
-          Cron.create(cron_string.c_str(), out1_off, true);
-        }
-      }
-      else
-      {
-        if (state == true)
-        {
-          Cron.create(cron_string.c_str(), out1_on, false);
-        }
-        else
-        {
-          Cron.create(cron_string.c_str(), out1_off, false);
+          duration1 = schedule["schedule"][j]["mapValue"]["fields"]["duration"]["integerValue"];
+
+          timmerCheck1 = true;
         }
       }
     }
-    else if (output == "out2" && status == true)
+    else if (output == "out2")
     {
-      if (repeat == true)
+      if (timmerCheck2 == false)
       {
-        if (state == true)
+        bool status = schedule["schedule"][j]["mapValue"]["fields"]["status"]["booleanValue"];
+        String time = schedule["schedule"][j]["mapValue"]["fields"]["time"]["stringValue"];
+        uint8_t day = schedule["schedule"][j]["mapValue"]["fields"]["every"]["integerValue"];
+        if (time == sendTime && status == true && days == day)
         {
-          Cron.create(cron_string.c_str(), out2_on, true);
+          duration2 = schedule["schedule"][j]["mapValue"]["fields"]["duration"]["integerValue"];
+
+          timmerCheck2 = true;
         }
-        else
+        else if (time == sendTime && status == true && day > 7)
         {
-          Cron.create(cron_string.c_str(), out2_off, true);
-        }
-      }
-      else
-      {
-        if (state == true)
-        {
-          Cron.create(cron_string.c_str(), out2_on, false);
-        }
-        else
-        {
-          Cron.create(cron_string.c_str(), out2_off, false);
+          duration2 = schedule["schedule"][j]["mapValue"]["fields"]["duration"]["integerValue"];
+
+          timmerCheck2 = true;
         }
       }
     }
-    else if (output == "out3" && status == true)
+    else if (output == "out3")
     {
-      if (repeat == true)
+      if (timmerCheck3 == false)
       {
-        if (state == true)
+        bool status = schedule["schedule"][j]["mapValue"]["fields"]["status"]["booleanValue"];
+        String time = schedule["schedule"][j]["mapValue"]["fields"]["time"]["stringValue"];
+        uint8_t day = schedule["schedule"][j]["mapValue"]["fields"]["every"]["integerValue"];
+        if (time == sendTime && status == true && days == day)
         {
-          Cron.create(cron_string.c_str(), out3_on, true);
+          duration3 = schedule["schedule"][j]["mapValue"]["fields"]["duration"]["integerValue"];
+
+          timmerCheck3 = true;
         }
-        else
+        else if (time == sendTime && status == true && day > 7)
         {
-          Cron.create(cron_string.c_str(), out3_off, true);
-        }
-      }
-      else
-      {
-        if (state == true)
-        {
-          Cron.create(cron_string.c_str(), out3_on, false);
-        }
-        else
-        {
-          Cron.create(cron_string.c_str(), out3_off, false);
+          duration3 = schedule["schedule"][j]["mapValue"]["fields"]["duration"]["integerValue"];
+
+          timmerCheck3 = true;
         }
       }
     }
-    else if (output == "out4" && status == true)
+    else if (output == "out4")
     {
-      if (repeat == true)
+      if (timmerCheck4 == false)
       {
-        if (state == true)
+        bool status = schedule["schedule"][j]["mapValue"]["fields"]["status"]["booleanValue"];
+        String time = schedule["schedule"][j]["mapValue"]["fields"]["time"]["stringValue"];
+        uint8_t day = schedule["schedule"][j]["mapValue"]["fields"]["every"]["integerValue"];
+        if (time == sendTime && status == true && days == day)
         {
-          Cron.create(cron_string.c_str(), out4_on, true);
+          duration4 = schedule["schedule"][j]["mapValue"]["fields"]["duration"]["integerValue"];
+
+          timmerCheck4 = true;
         }
-        else
+        else if (time == sendTime && status == true && day > 7)
         {
-          Cron.create(cron_string.c_str(), out4_off, true);
-        }
-      }
-      else
-      {
-        if (state == true)
-        {
-          Cron.create(cron_string.c_str(), out4_on, false);
-        }
-        else
-        {
-          Cron.create(cron_string.c_str(), out4_off, false);
+          duration4 = schedule["schedule"][j]["mapValue"]["fields"]["duration"]["integerValue"];
+
+          timmerCheck4 = true;
         }
       }
     }
@@ -737,18 +691,132 @@ void loop()
 {
   // put your main code here, to run repeatedly:
 
-  time(&rawtime);
-  timeinfo = localtime(&rawtime);
+  current_millis = millis();
 
   client.loop();
 
-  Cron.delay();
+  timeClient.update();
+
+  hour = String(timeClient.getHours());
+  minutes = String(timeClient.getMinutes());
+
+  if (hour.length() == 1)
+  {
+    hour = String("0" + hour);
+  }
+
+  if (minutes.length() == 1)
+  {
+    minutes = String("0" + minutes);
+  }
+
+  sendTime = String(hour + ":" + minutes);
+
+  days = timeClient.getDay();
+
+  schedule_check();
 
   btn1.tick();
   btn2.tick();
   btn3.tick();
   btn4.tick();
 
-  // delay(1000);
+  if (timmerCheck1 == true)
+  {
+
+    if (schedule_check1)
+    {
+      digitalWrite(out1, HIGH);
+
+      millis_duration1 = current_millis;
+
+      client.publish(topic1.c_str(), "true");
+
+      schedule_check1 = false;
+    }
+
+    if (current_millis - millis_duration1 >= duration1 * 60000)
+    {
+      digitalWrite(out1, LOW);
+
+      client.publish(topic1.c_str(), "false");
+
+      timmerCheck1 = false;
+      schedule_check1 = true;
+    }
+  }
+  else if (timmerCheck2 == true)
+  {
+
+    if (schedule_check2)
+    {
+      digitalWrite(out2, HIGH);
+
+      millis_duration2 = current_millis;
+
+      client.publish(topic2.c_str(), "true");
+
+      schedule_check2 = false;
+    }
+
+    if (current_millis - millis_duration2 >= duration2 * 60000)
+    {
+      digitalWrite(out2, LOW);
+
+      client.publish(topic2.c_str(), "false");
+
+      timmerCheck2 = false;
+      schedule_check2 = true;
+    }
+  }
+  else if (timmerCheck3 == true)
+  {
+
+    if (schedule_check3)
+    {
+      digitalWrite(out3, HIGH);
+
+      millis_duration3 = current_millis;
+
+      client.publish(topic3.c_str(), "true");
+
+      schedule_check3 = false;
+    }
+
+    if (current_millis - millis_duration3 >= duration3 * 60000)
+    {
+      digitalWrite(out3, LOW);
+
+      client.publish(topic3.c_str(), "false");
+
+      timmerCheck3 = false;
+      schedule_check3 = true;
+    }
+  }
+  else if (timmerCheck4 == true)
+  {
+
+    if (schedule_check4)
+    {
+      digitalWrite(out4, HIGH);
+
+      millis_duration4 = current_millis;
+
+      client.publish(topic4.c_str(), "true");
+
+      schedule_check4 = false;
+    }
+
+    if (current_millis - millis_duration4 >= duration4 * 60000)
+    {
+      digitalWrite(out4, LOW);
+
+      client.publish(topic4.c_str(), "false");
+
+      timmerCheck4 = false;
+      schedule_check4 = true;
+    }
+  }
+
   delayMicroseconds(5);
 }
