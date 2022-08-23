@@ -45,7 +45,7 @@ WiFiUDP udp;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-DynamicJsonDocument schedule(2048 * 2);
+DynamicJsonDocument schedule(2045);
 
 // 7700646186
 
@@ -69,8 +69,8 @@ OneButton btn4 = OneButton(
     true,
     true);
 
-CronId schedule_id[100];
-int cron_count = 0;
+// CronId schedule_id[52];
+// int cron_count = 0;
 
 String uniq_username = String("MIKIKO" + WiFi.macAddress());
 
@@ -79,12 +79,13 @@ const char *mqtt_username = uniq_username.c_str();
 const char *mqtt_password = "mikiko";
 const int mqtt_port = 1883;
 
-const char *ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 0;
-const int daylightOffset_sec = 8 * 3600;
+// const char *ntpServer = "pool.ntp.org";
+// const long gmtOffset_sec = 0;
+// const int daylightOffset_sec = 3600;
 
 String ssid; // string variable to store ssid
 String pss;  // string variable to store password
+String gmt;
 String MACADD = WiFi.macAddress();
 
 String topic1;
@@ -99,7 +100,7 @@ String documentPath;
 
 bool wifi_state = false;
 
-char udpbuf[255];
+char udpbuf[3];
 char replyPacket[] = "SON:4CH:MIKIKO";
 
 static void wifi_led();
@@ -108,201 +109,346 @@ void out1_on()
 {
   digitalWrite(out1, HIGH);
   Serial.println("out 1 on");
+
+  client.publish(topic1.c_str(), "true", true);
 }
 
 void out1_off()
 {
   digitalWrite(out1, LOW);
   Serial.println("out 1 off");
+  client.publish(topic1.c_str(), "false", true);
 }
 
 void out2_on()
 {
   digitalWrite(out2, HIGH);
   Serial.println("out 2 on");
+  client.publish(topic2.c_str(), "true", true);
 }
 
 void out2_off()
 {
   digitalWrite(out2, LOW);
   Serial.println("out 2 off");
+  client.publish(topic2.c_str(), "false", true);
 }
 
 void out3_on()
 {
   digitalWrite(out3, HIGH);
   Serial.println("out 3 on");
+  client.publish(topic3.c_str(), "true", true);
 }
 
 void out3_off()
 {
   digitalWrite(out3, LOW);
   Serial.println("out 3 off");
+  client.publish(topic3.c_str(), "false", true);
 }
 
 void out4_on()
 {
   digitalWrite(out4, HIGH);
   Serial.println("out 4 on");
+  client.publish(topic4.c_str(), "true", true);
 }
 
 void out4_off()
 {
   digitalWrite(out4, LOW);
   Serial.println("out 4 off");
+  client.publish(topic4.c_str(), "false", true);
 }
 
-void out1_on_once()
-{
-  out1_on();
+// void out1_on_once()
+// {
+//   out1_on();
 
-  FirebaseJson content;
+//   FirebaseJson content;
 
-  if (schedule["fields"]["schedule"]["arrayValue"]["values"].size() == 1)
-  {
-    content.set("fields/schedule/arrayValue/values/[0]");
-    if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
-      Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
-    else
-      Serial.println(fbdo.errorReason());
+//   if (schedule["fields"]["schedule"]["arrayValue"]["values"].size() == 1)
+//   {
+//     content.set("fields/schedule/arrayValue/values/[0]");
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
+//   else
+//   {
+//     for (int i = 0; i < schedule["fields"]["schedule"]["arrayValue"]["values"].size(); i++)
+//     {
+//       String id_schedule = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["id"]["stringValue"];
+//       String content_data = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["data"]["stringValue"];
 
-    Cron.free(1);
-  }
-  else
-  {
-    for (int i = 0; i < schedule["fields"]["schedule"]["arrayValue"]["values"].size(); i++)
-    {
-      String id_schedule = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["id"]["stringValue"];
-      String content_data = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["data"]["stringValue"];
+//       if (Cron.getTriggeredCronId() != i)
+//       {
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/data/stringValue", content_data);
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/id/stringValue", id_schedule);
+//       }
+//     }
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
 
-      if (Cron.getTriggeredCronId() != i)
-      {
-        content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/data/stringValue", content_data);
-        content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/id/stringValue", id_schedule);
-      }
+//   content.clear();
+// }
 
-      Cron.free(i);
-    }
-    if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
-      Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
-    else
-      Serial.println(fbdo.errorReason());
-  }
+// void out1_off_once()
+// {
+//   out1_off();
 
-  content.clear();
-}
+//   FirebaseJson content;
 
-void out1_off_once()
-{
-  out1_off();
+//   if (schedule["fields"]["schedule"]["arrayValue"]["values"].size() == 1)
+//   {
+//     content.set("fields/schedule/arrayValue/values/[0]");
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
+//   else
+//   {
+//     for (int i = 0; i < schedule["fields"]["schedule"]["arrayValue"]["values"].size(); i++)
+//     {
+//       String id_schedule = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["id"]["stringValue"];
+//       String content_data = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["data"]["stringValue"];
 
-  FirebaseJson content;
+//       if (Cron.getTriggeredCronId() != i)
+//       {
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/data/stringValue", content_data);
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/id/stringValue", id_schedule);
+//       }
+//     }
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
 
-  if (schedule["fields"]["schedule"]["arrayValue"]["values"].size() == 1)
-  {
-    content.set("fields/schedule/arrayValue/values/[0]");
-    if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
-      Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
-    else
-      Serial.println(fbdo.errorReason());
+//   content.clear();
+// }
 
-    Cron.free(1);
-  }
-  else
-  {
-    for (int i = 0; i < schedule["fields"]["schedule"]["arrayValue"]["values"].size(); i++)
-    {
-      String id_schedule = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["id"]["stringValue"];
-      String content_data = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["data"]["stringValue"];
+// void out2_on_once()
+// {
+//   out2_on();
 
-      if (Cron.getTriggeredCronId() != i)
-      {
-        content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/data/stringValue", content_data);
-        content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/id/stringValue", id_schedule);
-      }
+//   FirebaseJson content;
 
-      Cron.free(i);
-    }
-    if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
-      Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
-    else
-      Serial.println(fbdo.errorReason());
-  }
+//   if (schedule["fields"]["schedule"]["arrayValue"]["values"].size() == 1)
+//   {
+//     content.set("fields/schedule/arrayValue/values/[0]");
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
+//   else
+//   {
+//     for (int i = 0; i < schedule["fields"]["schedule"]["arrayValue"]["values"].size(); i++)
+//     {
+//       String id_schedule = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["id"]["stringValue"];
+//       String content_data = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["data"]["stringValue"];
 
-  content.clear();
-}
+//       if (Cron.getTriggeredCronId() != i)
+//       {
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/data/stringValue", content_data);
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/id/stringValue", id_schedule);
+//       }
+//     }
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
 
-void out2_on_once()
-{
-  out2_on();
+//   content.clear();
+// }
 
-  FirebaseJson content;
+// void out2_off_once()
+// {
+//   out2_off();
 
-  if (schedule["fields"]["schedule"]["arrayValue"]["values"].size() == 1)
-  {
-    content.set("fields/schedule/arrayValue/values/[0]");
-    if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
-      Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
-    else
-      Serial.println(fbdo.errorReason());
-  }
-  else
-  {
-    for (int i = 0; i < schedule["fields"]["schedule"]["arrayValue"]["values"].size(); i++)
-    {
-      String id_schedule = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["id"]["stringValue"];
-      String content_data = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["data"]["stringValue"];
+//   FirebaseJson content;
 
-      if (Cron.getTriggeredCronId() != i)
-      {
-        content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/data/stringValue", content_data);
-        content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/id/stringValue", id_schedule);
-      }
-    }
-    if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
-      Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
-    else
-      Serial.println(fbdo.errorReason());
-  }
+//   if (schedule["fields"]["schedule"]["arrayValue"]["values"].size() == 1)
+//   {
+//     content.set("fields/schedule/arrayValue/values/[0]");
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
+//   else
+//   {
+//     for (int i = 0; i < schedule["fields"]["schedule"]["arrayValue"]["values"].size(); i++)
+//     {
+//       String id_schedule = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["id"]["stringValue"];
+//       String content_data = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["data"]["stringValue"];
 
-  content.clear();
-}
+//       if (Cron.getTriggeredCronId() != i)
+//       {
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/data/stringValue", content_data);
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/id/stringValue", id_schedule);
+//       }
+//     }
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
 
-void out2_off_once()
-{
-  out2_off();
+//   content.clear();
+// }
 
-  FirebaseJson content;
+// void out3_on_once()
+// {
+//   out3_on();
 
-  if (schedule["fields"]["schedule"]["arrayValue"]["values"].size() == 1)
-  {
-    content.set("fields/schedule/arrayValue/values/[0]");
-    if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
-      Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
-    else
-      Serial.println(fbdo.errorReason());
-  }
-  else
-  {
-    for (int i = 0; i < schedule["fields"]["schedule"]["arrayValue"]["values"].size(); i++)
-    {
-      String id_schedule = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["id"]["stringValue"];
-      String content_data = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["data"]["stringValue"];
+//   FirebaseJson content;
 
-      if (Cron.getTriggeredCronId() != i)
-      {
-        content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/data/stringValue", content_data);
-        content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/id/stringValue", id_schedule);
-      }
-    }
-    if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
-      Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
-    else
-      Serial.println(fbdo.errorReason());
-  }
+//   if (schedule["fields"]["schedule"]["arrayValue"]["values"].size() == 1)
+//   {
+//     content.set("fields/schedule/arrayValue/values/[0]");
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
+//   else
+//   {
+//     for (int i = 0; i < schedule["fields"]["schedule"]["arrayValue"]["values"].size(); i++)
+//     {
+//       String id_schedule = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["id"]["stringValue"];
+//       String content_data = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["data"]["stringValue"];
 
-  content.clear();
-}
+//       if (Cron.getTriggeredCronId() != i)
+//       {
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/data/stringValue", content_data);
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/id/stringValue", id_schedule);
+//       }
+//     }
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
+
+//   content.clear();
+// }
+
+// void out3_off_once()
+// {
+//   out3_off();
+
+//   FirebaseJson content;
+
+//   if (schedule["fields"]["schedule"]["arrayValue"]["values"].size() == 1)
+//   {
+//     content.set("fields/schedule/arrayValue/values/[0]");
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
+//   else
+//   {
+//     for (int i = 0; i < schedule["fields"]["schedule"]["arrayValue"]["values"].size(); i++)
+//     {
+//       String id_schedule = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["id"]["stringValue"];
+//       String content_data = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["data"]["stringValue"];
+
+//       if (Cron.getTriggeredCronId() != i)
+//       {
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/data/stringValue", content_data);
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/id/stringValue", id_schedule);
+//       }
+//     }
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
+
+//   content.clear();
+// }
+
+// void out4_on_once()
+// {
+//   out4_on();
+
+//   FirebaseJson content;
+
+//   if (schedule["fields"]["schedule"]["arrayValue"]["values"].size() == 1)
+//   {
+//     content.set("fields/schedule/arrayValue/values/[0]");
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
+//   else
+//   {
+//     for (int i = 0; i < schedule["fields"]["schedule"]["arrayValue"]["values"].size(); i++)
+//     {
+//       String id_schedule = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["id"]["stringValue"];
+//       String content_data = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["data"]["stringValue"];
+
+//       if (Cron.getTriggeredCronId() != i)
+//       {
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/data/stringValue", content_data);
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/id/stringValue", id_schedule);
+//       }
+//     }
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
+
+//   content.clear();
+// }
+
+// void out4_off_once()
+// {
+//   out4_off();
+
+//   FirebaseJson content;
+
+//   if (schedule["fields"]["schedule"]["arrayValue"]["values"].size() == 1)
+//   {
+//     content.set("fields/schedule/arrayValue/values/[0]");
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
+//   else
+//   {
+//     for (int i = 0; i < schedule["fields"]["schedule"]["arrayValue"]["values"].size(); i++)
+//     {
+//       String id_schedule = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["id"]["stringValue"];
+//       String content_data = schedule["fields"]["schedule"]["arrayValue"]["values"][i]["mapValue"]["fields"]["data"]["stringValue"];
+
+//       if (Cron.getTriggeredCronId() != i)
+//       {
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/data/stringValue", content_data);
+//         content.set("fields/schedule/arrayValue/values/[" + String(i) + "]/mapValue/fields/id/stringValue", id_schedule);
+//       }
+//     }
+//     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "" /* databaseId can be (default) or empty */, documentPath.c_str(), content.raw(), "schedule"))
+//       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+//     else
+//       Serial.println(fbdo.errorReason());
+//   }
+
+//   content.clear();
+// }
 
 void schedule_check();
 
@@ -506,12 +652,15 @@ void mqtt_process(char *topic, byte *payload)
     {
       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
 
-      for (byte i = 0; i < 51; i++)
+      if (Cron.count() > 20)
       {
-        Cron.free(i);
+        for (byte i = 0; i < 30; i++)
+        {
+          Cron.free(i);
+        }
       }
 
-      DeserializationError error = deserializeJson(schedule, fbdo.payload());
+      DeserializationError error = deserializeJson(schedule, fbdo.payload().c_str());
 
       if (error)
       {
@@ -525,36 +674,6 @@ void mqtt_process(char *topic, byte *payload)
     else
     {
       Serial.println(fbdo.errorReason());
-    }
-  }
-  else if (strTopic == "data/test")
-  {
-    msg = String((char *)payload);
-
-    Cron.create(msg.c_str(), out1_on, false);
-
-    cron_count++;
-  }
-  else if (strTopic == "data/loop")
-  {
-    msg = String((char *)payload);
-
-    // Cron.createloop(msg.c_str(), out2_on, false);
-
-    cron_count++;
-  }
-  else if (strTopic == "data/t")
-  {
-    for (byte i = 0; i < 51; i++)
-    {
-      Cron.free(i);
-    }
-  }
-  else if (strTopic == "data/l")
-  {
-    for (byte i = 50; i < 255; i++)
-    {
-      Cron.free(i);
     }
   }
 }
@@ -586,6 +705,7 @@ void btnLongPress()
 {
   writeStringToFlash("", 0);
   writeStringToFlash("", 40);
+  writeStringToFlash("", 80);
   ESP.restart();
 }
 
@@ -655,6 +775,9 @@ void setup()
   pss = readStringFromFlash(40); // Read Password stored at address 40
   Serial.print("psss = ");
   Serial.println(pss);
+  gmt = readStringFromFlash(80);
+  Serial.print("gmt = ");
+  Serial.println(gmt);
 
   ticker.attach(0.2, wifi_led);
 
@@ -669,8 +792,9 @@ void setup()
   // }
   // Serial.println("CONNECTED to WIFI");
 
-  writeStringToFlash("Mikikotech", 0);
-  writeStringToFlash("6jt/bulan", 40);
+  // writeStringToFlash("", 0);
+  // writeStringToFlash("", 40);
+  // writeStringToFlash("", 80);
 
   if (ssid.length() > 0 && pss.length() > 0)
   {
@@ -725,10 +849,11 @@ void setup()
       btn4.tick();
       if (udp.parsePacket())
       {
-        udp.read(udpbuf, 255);
+        udp.read(udpbuf, 3);
         Serial.print("message = ");
         Serial.print(udpbuf);
-
+        writeStringToFlash(udpbuf, 80);
+        gmt = udpbuf;
         Serial.print(", from =");
         Serial.print(udp.remoteIP());
 
@@ -757,14 +882,14 @@ void setup()
 
   wifi_state = true;
 
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  configTime(0, gmt.toInt() * 3600, "pool.ntp.org");
 
   struct tm tm_newtime;
 
   while (getLocalTime(&tm_newtime))
   {
     Serial.print(".");
-    delay(1000);
+    delay(100);
   }
 
   client.setServer(mqtt_broker, mqtt_port);
@@ -781,11 +906,6 @@ void setup()
       client.subscribe(topic2.c_str());
       client.subscribe(topic3.c_str());
       client.subscribe(topic4.c_str());
-
-      client.subscribe("data/test");
-      client.subscribe("data/t");
-      client.subscribe("data/loop");
-      client.subscribe("data/l");
 
       client.subscribe(schedule_topic.c_str());
 
@@ -810,7 +930,7 @@ void setup()
 
   config.token_status_callback = tokenStatusCallback;
 
-  fbdo.setResponseSize(4095 * 3);
+  fbdo.setResponseSize(4095 * 2);
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
 
@@ -831,120 +951,119 @@ void schedule_check()
     String cron_string = getValue(cron_data, 58, 0);
     String output = getValue(cron_data, 58, 1);
     bool state = getValue(cron_data, 58, 2) == "1" ? true : false;
-    bool repeat = getValue(cron_data, 58, 3) == "1" ? true : false;
-    bool status = getValue(cron_data, 58, 4) == "1" ? true : false;
+    bool status = getValue(cron_data, 58, 3) == "1" ? true : false;
 
-    Serial.print("cron is =");
-    Serial.print(cron_string);
-    Serial.println("end");
-    Serial.print("output is = ");
-    Serial.println(output);
-    Serial.print("status is = ");
-    Serial.println(state);
-    Serial.print("repeat is = ");
-    Serial.println(repeat);
-    Serial.print("status is = ");
-    Serial.println(status);
+    // Serial.print("cron is =");
+    // Serial.print(cron_string);
+    // Serial.println("end");
+    // Serial.print("output is = ");
+    // Serial.println(output);
+    // Serial.print("status is = ");
+    // Serial.println(state);
+    // Serial.print("repeat is = ");
+    // Serial.println(repeat);
+    // Serial.print("status is = ");
+    // Serial.println(status);
 
     if (output == "out1" && status == true)
     {
-      if (repeat == true)
+      // if (repeat == true)
+      // {
+      //   if (state == true)
+      //   {
+      //     Cron.create(cron_string.c_str(), out1_on_once, true);
+      //   }
+      //   else
+      //   {
+      //     Cron.create(cron_string.c_str(), out1_off_once, true);
+      //   }
+      // }
+      // else
+      // {
+      if (state == true)
       {
-        if (state == true)
-        {
-          Cron.create(cron_string.c_str(), out1_on_once, true);
-        }
-        else
-        {
-          Cron.create(cron_string.c_str(), out1_off_once, true);
-        }
+        Cron.create(cron_string.c_str(), out1_on, false);
       }
       else
       {
-        if (state == true)
-        {
-          Cron.create(cron_string.c_str(), out1_on, false);
-        }
-        else
-        {
-          Cron.create(cron_string.c_str(), out1_off, false);
-        }
+        Cron.create(cron_string.c_str(), out1_off, false);
       }
+      // }
     }
     else if (output == "out2" && status == true)
     {
-      if (repeat == true)
+      // if (repeat == true)
+      // {
+      //   if (state == true)
+      //   {
+      //     Cron.create(cron_string.c_str(), out2_on_once, true);
+      //   }
+      //   else
+      //   {
+      //     Cron.create(cron_string.c_str(), out2_off_once, true);
+      //   }
+      // }
+      // else
+      // {
+      if (state == true)
       {
-        if (state == true)
-        {
-          Cron.create(cron_string.c_str(), out2_on_once, true);
-        }
-        else
-        {
-          Cron.create(cron_string.c_str(), out2_off_once, true);
-        }
+        Cron.create(cron_string.c_str(), out2_on, false);
       }
       else
       {
-        if (state == true)
-        {
-          Cron.create(cron_string.c_str(), out2_on, false);
-        }
-        else
-        {
-          Cron.create(cron_string.c_str(), out2_off, false);
-        }
+        Cron.create(cron_string.c_str(), out2_off, false);
       }
+      // }
     }
     else if (output == "out3" && status == true)
     {
-      if (repeat == true)
+      // if (repeat == true)
+      // {
+      //   if (state == true)
+      //   {
+      //     Cron.create(cron_string.c_str(), out3_on_once, true);
+      //   }
+      //   else
+      //   {
+      //     Cron.create(cron_string.c_str(), out3_off_once, true);
+      //   }
+      // }
+      // else
+      // {
+      if (state == true)
       {
-        if (state == true)
-        {
-          Cron.create(cron_string.c_str(), out3_on, true);
-        }
-        else
-        {
-          Cron.create(cron_string.c_str(), out3_off, true);
-        }
+        Cron.create(cron_string.c_str(), out3_on, false);
       }
       else
       {
-        if (state == true)
-        {
-          Cron.create(cron_string.c_str(), out3_on, false);
-        }
-        else
-        {
-          Cron.create(cron_string.c_str(), out3_off, false);
-        }
+        Cron.create(cron_string.c_str(), out3_off, false);
       }
+      // }
     }
     else if (output == "out4" && status == true)
     {
-      if (repeat == true)
+      // if (repeat == true)
+      // {
+      //   if (state == true)
+      //   {
+      //     Cron.create(cron_string.c_str(), out4_on_once, true);
+      //   }
+      //   else
+      //   {
+      //     Cron.create(cron_string.c_str(), out4_off_once, true);
+      //   }
+      // }
+      // else
+      // {
+      if (state == true)
       {
-        if (state == true)
-        {
-          Cron.create(cron_string.c_str(), out4_on, true);
-        }
-        else
-        {
-          Cron.create(cron_string.c_str(), out4_off, true);
-        }
+        Cron.create(cron_string.c_str(), out4_on, false);
       }
       else
       {
-        if (state == true)
-        {
-          Cron.create(cron_string.c_str(), out4_on, false);
-        }
-        else
-        {
-          Cron.create(cron_string.c_str(), out4_off, false);
-        }
+        Cron.create(cron_string.c_str(), out4_off, false);
       }
+      // }
     }
   }
 }
@@ -956,12 +1075,9 @@ void loop()
 {
   // put your main code here, to run repeatedly:
 
-  // time(&rawtime);
-  // timeinfo = localtime(&rawtime);
+  time(&rawtime);
+  timeinfo = localtime(&rawtime);
   // Serial.println(asctime(timeinfo));
-
-  time_t now = time(nullptr);
-  // Serial.println(ctime(&now));
 
   client.loop();
 
