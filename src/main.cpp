@@ -38,7 +38,6 @@
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
-FirebaseJson json;
 
 Ticker ticker;
 WiFiUDP udp;
@@ -68,6 +67,9 @@ OneButton btn4 = OneButton(
     true,
     true);
 
+CronId schedule_id[100];
+int cron_count = 0;
+
 String uniq_username = String("MIKIKO" + WiFi.macAddress());
 
 const char *mqtt_broker = "broker.hivemq.com";
@@ -93,9 +95,6 @@ String fwRespone_topic;
 String schedule_topic;
 String documentPath;
 
-int schedule_duration[10];
-int schedule_pin_out[10];
-
 bool wifi_state = false;
 
 char udpbuf[255];
@@ -106,41 +105,49 @@ static void wifi_led();
 void out1_on()
 {
   digitalWrite(out1, HIGH);
+  Serial.println("out 1 on");
 }
 
 void out1_off()
 {
   digitalWrite(out1, LOW);
+  Serial.println("out 1 off");
 }
 
 void out2_on()
 {
   digitalWrite(out2, HIGH);
+  Serial.println("out 2 on");
 }
 
 void out2_off()
 {
   digitalWrite(out2, LOW);
+  Serial.println("out 2 off");
 }
 
 void out3_on()
 {
   digitalWrite(out3, HIGH);
+  Serial.println("out 3 on");
 }
 
 void out3_off()
 {
   digitalWrite(out3, LOW);
+  Serial.println("out 3 off");
 }
 
 void out4_on()
 {
   digitalWrite(out4, HIGH);
+  Serial.println("out 4 on");
 }
 
 void out4_off()
 {
   digitalWrite(out4, LOW);
+  Serial.println("out 4 off");
 }
 
 void schedule_check();
@@ -262,6 +269,8 @@ void fcsDownloadCallback(FCS_DownloadStatusInfo info)
   }
 }
 
+CronId id;
+
 void mqtt_process(char *topic, byte *payload)
 {
 
@@ -343,21 +352,60 @@ void mqtt_process(char *topic, byte *payload)
     {
       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
 
-      // for (int j = 0; j < schedule["schedule"].size(); j++)
-      // {
-      //   Cron.free(schedule_id[j]);
+      for (byte i = 0; i < 51; i++)
+      {
+        Cron.free(i);
+      }
 
-      //   schedule_id[j] = dtINVALID_ALARM_ID;
-      // }
+      DeserializationError error = deserializeJson(schedule, fbdo.payload());
+      // schedule["schedule"] = schedule["fields"]["schedule"]["arrayValue"]["values"];
 
-      deserializeJson(schedule, fbdo.payload());
-      schedule["schedule"] = schedule["fields"]["schedule"]["arrayValue"]["values"];
+      if (error)
+      {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(error.f_str());
+        return;
+      }
 
-      schedule_check();
+      Serial.println(schedule["fields"]["schedule"]["arrayValue"]["values"].size());
+      // schedule_check();
+
+      Serial.print("schedule json capacity");
+      Serial.println(schedule.memoryUsage());
     }
     else
     {
       Serial.println(fbdo.errorReason());
+    }
+  }
+  else if (strTopic == "data/test")
+  {
+    msg = String((char *)payload);
+
+    Cron.create(msg.c_str(), out1_on, false);
+
+    cron_count++;
+  }
+  else if (strTopic == "data/loop")
+  {
+    msg = String((char *)payload);
+
+    Cron.createloop(msg.c_str(), out2_on, false);
+
+    cron_count++;
+  }
+  else if (strTopic == "data/t")
+  {
+    for (byte i = 0; i < 51; i++)
+    {
+      Cron.free(i);
+    }
+  }
+  else if (strTopic == "data/l")
+  {
+    for (byte i = 50; i < 255; i++)
+    {
+      Cron.free(i);
     }
   }
 }
@@ -450,6 +498,8 @@ void setup()
   schedule_topic = String("/" + String(MACADD) + "/data/schedule");
   documentPath = String("devices/" + MACADD);
 
+  // ["fields"]["schedule"]["arrayValue"]["values"];
+
   ssid = readStringFromFlash(0); // Read SSID stored at address 0
   Serial.print("SSID = ");
   Serial.println(ssid);
@@ -470,8 +520,8 @@ void setup()
   // }
   // Serial.println("CONNECTED to WIFI");
 
-  // writeStringToFlash("", 0);
-  // writeStringToFlash("", 40);
+  // writeStringToFlash("Wifi saya", 0);
+  // writeStringToFlash("1sampai9", 40);
 
   if (ssid.length() > 0 && pss.length() > 0)
   {
@@ -583,6 +633,11 @@ void setup()
       client.subscribe(topic3.c_str());
       client.subscribe(topic4.c_str());
 
+      client.subscribe("data/test");
+      client.subscribe("data/t");
+      client.subscribe("data/loop");
+      client.subscribe("data/l");
+
       client.subscribe(schedule_topic.c_str());
 
       client.subscribe(fwUpdate_topic.c_str());
@@ -606,7 +661,7 @@ void setup()
 
   config.token_status_callback = tokenStatusCallback;
 
-  fbdo.setResponseSize(4095);
+  fbdo.setResponseSize(4095 * 3);
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
 
@@ -622,13 +677,22 @@ void schedule_check()
 
   // int index = schedule["schedule"].size() - 1;
   // int selisih = schedule["schedule"].size() - Cron.count();
-  for (int j = 0; j < schedule["schedule"].size(); j++)
+  for (int j = 0; j < schedule["fields"]["schedule"]["arrayValue"]["values"].size(); j++)
   {
-    String cron_string = schedule["schedule"][j]["mapValue"]["fields"]["cron"]["stringValue"];
-    String output = schedule["schedule"][j]["mapValue"]["fields"]["output"]["stringValue"];
-    bool repeat = schedule["schedule"][j]["mapValue"]["fields"]["repeat"]["booleanValue"];
-    bool status = schedule["schedule"][j]["mapValue"]["fields"]["status"]["booleanValue"];
-    bool state = schedule["schedule"][j]["mapValue"]["fields"]["state"]["booleanValue"];
+    String cron_string = schedule["fields"]["schedule"]["arrayValue"]["values"][j]["mapValue"]["fields"]["cron"]["stringValue"];
+    String output = schedule["fields"]["schedule"]["arrayValue"]["values"][j]["mapValue"]["fields"]["output"]["stringValue"];
+    bool repeat = schedule["fields"]["schedule"]["arrayValue"]["values"][j]["mapValue"]["fields"]["repeat"]["booleanValue"];
+    bool status = schedule["fields"]["schedule"]["arrayValue"]["values"][j]["mapValue"]["fields"]["status"]["booleanValue"];
+    bool state = schedule["fields"]["schedule"]["arrayValue"]["values"][j]["mapValue"]["fields"]["state"]["booleanValue"];
+
+    // Serial.print("output is = ");
+    // Serial.println(output);
+    // Serial.print("status is = ");
+    // Serial.println(status);
+    // Serial.print("repeat is = ");
+    // Serial.println(repeat);
+    // Serial.print("status is = ");
+    // Serial.println(status);
 
     if (output == "out1" && status == true)
     {
@@ -733,6 +797,9 @@ void schedule_check()
   }
 }
 
+unsigned long dataMillis = 0;
+int count = 0;
+
 void loop()
 {
   // put your main code here, to run repeatedly:
@@ -748,6 +815,10 @@ void loop()
   btn2.tick();
   btn3.tick();
   btn4.tick();
+
+  // Serial.println(Cron.count());
+
+  // Serial.println(ESP.getMaxFreeBlockSize());
 
   // delay(1000);
   delayMicroseconds(5);
