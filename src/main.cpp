@@ -1,3 +1,18 @@
+// #include <Arduino.h>
+
+// void setup()
+// {
+//   pinMode(4, OUTPUT);
+// }
+
+// void loop()
+// {
+//   digitalWrite(4, HIGH);
+//   delay(100);
+//   digitalWrite(4, LOW);
+//   delay(100);
+// }
+
 // #define ARDUINOJSON_ENABLE_PROGMEM 1
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
@@ -24,8 +39,8 @@
 #define DEVICE_PASS "mikikoSON"
 #define FIRMWARE_VERSION "0.0.1"
 
-#define LENGTH(x) (strlen(x) + 1) // length of char string
-#define EEPROM_SIZE 200           // EEPROM size
+#define LENGTH(x) (strlen(x) + 1)
+#define EEPROM_SIZE 200
 
 #define out1 12
 #define out2 5
@@ -33,8 +48,6 @@
 #define out4 15
 
 #define WIFI_LED 13
-
-// File file;
 
 FirebaseData fbdo;
 FirebaseAuth auth;
@@ -45,10 +58,6 @@ WiFiUDP udp;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
-
-// DynamicJsonDocument schedule(2045);
-
-// 7700646186
 
 time_t rawtime;
 struct tm *timeinfo;
@@ -102,7 +111,6 @@ String documentPath;
 bool wifi_state = false;
 
 char udpbuf[3];
-char replyPacket[] = "SON:4CH:MIKIKO";
 
 static void wifi_led();
 
@@ -644,61 +652,28 @@ void mqtt_process(char *topic, byte *payload)
   }
   else if (strTopic == fwUpdate_topic)
   {
-    if (!Firebase.Storage.downloadOTA(&fbdo, STORAGE_BUCKET_ID, "SONTH10/firmware.bin", fcsDownloadCallback))
+    if (!Firebase.Storage.downloadOTA(&fbdo, STORAGE_BUCKET_ID, "/SONMIKIKO/firmware.bin", fcsDownloadCallback))
       Serial.println(fbdo.errorReason());
+    // gs://mikiko-c5ca4.appspot.com/SONMIKIKO/firmware.bin
   }
   else if (strTopic == schedule_topic)
   {
 
     DynamicJsonDocument schedule(2045);
-    StaticJsonDocument<256> filter;
+    StaticJsonDocument<114> filter;
 
     filter["fields"]["schedule"]["arrayValue"]["values"][0]["mapValue"] = true;
-    filter["fields"]["schedule"]["arrayValue"]["values"][1]["mapValue"] = true;
-    filter["fields"]["schedule"]["arrayValue"]["values"][2]["mapValue"] = true;
-    filter["fields"]["schedule"]["arrayValue"]["values"][3]["mapValue"] = true;
-    filter["fields"]["schedule"]["arrayValue"]["values"][4]["mapValue"] = true;
-    filter["fields"]["schedule"]["arrayValue"]["values"][5]["mapValue"] = true;
-    filter["fields"]["schedule"]["arrayValue"]["values"][6]["mapValue"] = true;
-    filter["fields"]["schedule"]["arrayValue"]["values"][7]["mapValue"] = true;
 
     if (Firebase.Firestore.getDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str(), "schedule"))
     {
       Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
 
-      // schedule.clear();
-
-      // if (Cron.count() > 20)
-      // {
-      for (byte i = 0; i < 30; i++)
+      for (byte i = 0; i < 51; i++)
       {
-        if (Cron.getTriggeredCronId() != i)
-        {
-          Cron.free(i);
-        }
+        Cron.free(i);
       }
-      // }
 
-      // {
-      //   "name": "projects/mikiko-c5ca4/databases/(default)/documents/devices/500291da6666",
-      //   "fields": {
-      //     "schedule": {
-      //       "arrayValue": {
-      //         "values": [
-      //           {
-      //             "mapValue": {
-      //               "fields": {
-      //                 "data": {
-      //                   "stringValue": "0 0 0 * * *,out1,1,1,1"
-      //                 },
-      //                 "id": {
-      //                   "stringValue": "skalksjaiudh"
-      //                 }
-      //               }
-      //             }
-      //           },
-
-      Serial.println(fbdo.payloadLength());
+      // Serial.println(fbdo.payloadLength());
 
       DeserializationError error = deserializeJson(schedule, fbdo.payload().c_str(), DeserializationOption::Filter(filter));
 
@@ -709,7 +684,7 @@ void mqtt_process(char *topic, byte *payload)
         return;
       }
 
-      serializeJson(schedule, Serial);
+      // serializeJson(schedule, Serial);
 
       // schedule_check();
 
@@ -840,6 +815,8 @@ void mqtt_process(char *topic, byte *payload)
     {
       Serial.println(fbdo.errorReason());
     }
+
+    schedule.clear();
   }
 }
 
@@ -917,6 +894,13 @@ void setup()
   btn3.tick();
   btn4.tick();
 
+  Serial.println(lround(ESP.getChipId() / 1234));
+
+  String str_reply = String("SON:4CH:" + String(lround(ESP.getChipId() / 1234)) + ":MIKIKO");
+  char replyPacket[str_reply.length() + 1];
+
+  strcpy(replyPacket, str_reply.c_str());
+
   MACADD = getValue(MACADD, 58, 0) + getValue(MACADD, 58, 1) + getValue(MACADD, 58, 2) + getValue(MACADD, 58, 3) + getValue(MACADD, 58, 4) + getValue(MACADD, 58, 5);
   MACADD.toLowerCase();
 
@@ -957,9 +941,9 @@ void setup()
   // }
   // Serial.println("CONNECTED to WIFI");
 
-  // writeStringToFlash("Mikikotech", 0);
-  // writeStringToFlash("6jt/bulan", 40);
-  // writeStringToFlash("8", 80);
+  // writeStringToFlash("", 0);
+  // writeStringToFlash("", 40);
+  // writeStringToFlash("", 80);
 
   if (ssid.length() > 0 && pss.length() > 0)
   {
@@ -1054,7 +1038,7 @@ void setup()
   while (getLocalTime(&tm_newtime))
   {
     Serial.print(".");
-    delay(100);
+    // delay(100);
   }
 
   client.setServer(mqtt_broker, mqtt_port);
@@ -1096,6 +1080,8 @@ void setup()
   config.token_status_callback = tokenStatusCallback;
 
   fbdo.setResponseSize(4095 * 2);
+  fbdo.setBSSLBufferSize(1024, 1024);
+  config.fcs.download_buffer_size = 2048;
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
 
