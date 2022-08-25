@@ -40,7 +40,7 @@
 #define FIRMWARE_VERSION "0.0.1"
 
 #define LENGTH(x) (strlen(x) + 1)
-#define EEPROM_SIZE 200
+#define EEPROM_SIZE 100
 
 #define out1 12
 #define out2 5
@@ -117,7 +117,7 @@ static void wifi_led();
 void out1_on()
 {
   digitalWrite(out1, HIGH);
-  Serial.println("out 1 on");
+  // Serial.println("out 1 on");
 
   client.publish(topic1.c_str(), "true", true);
 }
@@ -125,49 +125,49 @@ void out1_on()
 void out1_off()
 {
   digitalWrite(out1, LOW);
-  Serial.println("out 1 off");
+  // Serial.println("out 1 off");
   client.publish(topic1.c_str(), "false", true);
 }
 
 void out2_on()
 {
   digitalWrite(out2, HIGH);
-  Serial.println("out 2 on");
+  // Serial.println("out 2 on");
   client.publish(topic2.c_str(), "true", true);
 }
 
 void out2_off()
 {
   digitalWrite(out2, LOW);
-  Serial.println("out 2 off");
+  // Serial.println("out 2 off");
   client.publish(topic2.c_str(), "false", true);
 }
 
 void out3_on()
 {
   digitalWrite(out3, HIGH);
-  Serial.println("out 3 on");
+  // Serial.println("out 3 on");
   client.publish(topic3.c_str(), "true", true);
 }
 
 void out3_off()
 {
   digitalWrite(out3, LOW);
-  Serial.println("out 3 off");
+  // Serial.println("out 3 off");
   client.publish(topic3.c_str(), "false", true);
 }
 
 void out4_on()
 {
   digitalWrite(out4, HIGH);
-  Serial.println("out 4 on");
+  // Serial.println("out 4 on");
   client.publish(topic4.c_str(), "true", true);
 }
 
 void out4_off()
 {
   digitalWrite(out4, LOW);
-  Serial.println("out 4 off");
+  // Serial.println("out 4 off");
   client.publish(topic4.c_str(), "false", true);
 }
 
@@ -578,8 +578,6 @@ void fcsDownloadCallback(FCS_DownloadStatusInfo info)
   }
 }
 
-CronId id;
-
 void mqtt_process(char *topic, byte *payload)
 {
 
@@ -919,18 +917,18 @@ void setup()
   // ["fields"]["schedule"]["arrayValue"]["values"];
 
   ssid = readStringFromFlash(0); // Read SSID stored at address 0
-  Serial.print("SSID = ");
-  Serial.println(ssid);
+  // Serial.print("SSID = ");
+  // Serial.println(ssid);
   pss = readStringFromFlash(40); // Read Password stored at address 40
-  Serial.print("psss = ");
-  Serial.println(pss);
+  // Serial.print("psss = ");
+  // Serial.println(pss);
   gmt = readStringFromFlash(80);
-  Serial.print("gmt = ");
-  Serial.println(gmt);
+  // Serial.print("gmt = ");
+  // Serial.println(gmt);
 
   ticker.attach(0.2, wifi_led);
 
-  Serial.println(MACADD);
+  // Serial.println(MACADD);
 
   // WiFi.begin("Wifi saya", "1sampai9");
 
