@@ -650,6 +650,13 @@ void mqtt_process(char *topic, byte *payload)
       digitalWrite(out4, LOW);
     }
   }
+  else if (strTopic == "data/t")
+  {
+
+    msg = String((char *)payload);
+
+    WiFi.mode(WIFI_OFF);
+  }
   else if (strTopic == fwUpdate_topic)
   {
     if (!Firebase.Storage.downloadOTA(&fbdo, STORAGE_BUCKET_ID, "/SONMIKIKO/firmware.bin", fcsDownloadCallback))
@@ -904,10 +911,10 @@ void setup()
   MACADD = getValue(MACADD, 58, 0) + getValue(MACADD, 58, 1) + getValue(MACADD, 58, 2) + getValue(MACADD, 58, 3) + getValue(MACADD, 58, 4) + getValue(MACADD, 58, 5);
   MACADD.toLowerCase();
 
-  topic1 = String("/" + String(MACADD) + "/data/btnone");
-  topic2 = String("/" + String(MACADD) + "/data/btntwo");
-  topic3 = String("/" + String(MACADD) + "/data/btnthree");
-  topic4 = String("/" + String(MACADD) + "/data/btnfour");
+  topic1 = String("/" + String(MACADD) + "/data/btn1");
+  topic2 = String("/" + String(MACADD) + "/data/btn2");
+  topic3 = String("/" + String(MACADD) + "/data/btn3");
+  topic4 = String("/" + String(MACADD) + "/data/btn4");
 
   fwVersion_topic = String("/" + MACADD + "/data/firmwareversion");
   fwUpdate_topic = String("/" + String(MACADD) + "/data/ota");
@@ -1055,6 +1062,8 @@ void setup()
       client.subscribe(topic2.c_str());
       client.subscribe(topic3.c_str());
       client.subscribe(topic4.c_str());
+
+      client.subscribe("data/t");
 
       client.subscribe(schedule_topic.c_str());
 
