@@ -218,7 +218,7 @@ void removeSchedule(CronID_t triggerCron)
     {
         String schedule_id = schedule[i]["id"];
         CronID_t cron_id = schedule[i]["cronId"];
-        String cron_data = schedule[i]["data"];
+        String cron_data = schedule[i]["cron"];
 
         if (triggerCron == cron_id)
         {
@@ -232,7 +232,7 @@ void removeSchedule(CronID_t triggerCron)
             api_endpoint = String("http://mikiko.herokuapp.com/schedule/remove/" + MACADD);
 
             http_data_remove["id"] = schedule_id;
-            http_data_remove["data"] = cron_data;
+            http_data_remove["cron"] = cron_data;
 
             serializeJson(http_data_remove, string_http_data_remove);
 
@@ -254,7 +254,6 @@ void removeSchedule(CronID_t triggerCron)
             // http_data_remove.clear();
 
             Cron.free(cron_id);
-            cron_id = dtINVALID_ALARM_ID;
             schedule.remove(i);
 
             break;
@@ -324,7 +323,7 @@ void schedule_check()
 {
     for (size_t j = 0; j < schedule.size(); j++)
     {
-        String cron_data = schedule[j]["data"];
+        String cron_data = schedule[j]["cron"];
         String cron_string = getValue(cron_data, 58, 0);                // cron data
         String output = getValue(cron_data, 58, 1);                     // output
         bool state = getValue(cron_data, 58, 2) == "1" ? true : false;  // output state
@@ -452,7 +451,7 @@ void schedule_check()
 
 void schedule_edit_check(DynamicJsonDocument schedule_data)
 {
-    String cron_data = schedule_data["data"];
+    String cron_data = schedule_data[0]["cron"];
     String cron_string = getValue(cron_data, 58, 0);                // cron data
     String output = getValue(cron_data, 58, 1);                     // output
     bool state = getValue(cron_data, 58, 2) == "1" ? true : false;  // output state
@@ -577,8 +576,8 @@ void schedule_edit_check(DynamicJsonDocument schedule_data)
         }
     }
 
-    schedule[schedule_size]["id"] = schedule_data["id"];
-    schedule[schedule_size]["data"] = schedule_data["data"];
+    schedule[schedule_size]["id"] = schedule_data[0]["id"];
+    schedule[schedule_size]["cron"] = schedule_data[0]["cron"];
 
     serializeJson(schedule, Serial);
 }
@@ -693,55 +692,105 @@ void mqtt_process(char *topic, byte *payload)
     }
     else if (strTopic == schedule_topic)
     {
-
-        DynamicJsonDocument schedule_payload(512);
-
         msg = String((char *)payload);
 
-        deserializeJson(schedule_payload, msg.c_str());
+        // Serial.println(msg);
 
-        serializeJson(schedule_payload, Serial);
-
-        Serial.println("---------");
-
-        if (schedule_payload["type"] == "11") // add schedule
+        if (msg == "11")
         {
-            schedule_edit_check(schedule_payload);
-        }
-        else if (schedule_payload["type"] == "22") // remove schedule
-        {
-            for (size_t i = 0; i < schedule.size(); i++)
+            api_endpoint = String("http://mikiko.herokuapp.com/schedule/getlast/" + MACADD);
+
+            // serializeJson(http_data, string_http_data);
+
+            http.begin(scheduleClient, api_endpoint.c_str());
+
+            if (http.GET() > 0)
             {
-                if (schedule[i]["id"] == schedule_payload["id"])
+                Serial.print("HTTP Response code: ");
+                // Serial.println(http.getString());
+
+                deserializeJson(http_data, http.getString().c_str());
+
+                // serializeJson(http_data, Serial);
+
+                schedule_edit_check(http_data);
+            }
+            else
+            {
+                Serial.print("Error code: ");
+            }
+            // Free resources
+            http.end();
+
+            http_data.clear();
+        }
+        else
+        {
+            String schedule_message = getValue(msg, 58, 0);
+            String schedule_message_id = getValue(msg, 58, 1);
+
+            Serial.println(schedule_message);
+            Serial.println(schedule_message_id);
+
+            if (schedule_message == "22")
+            {
+                for (size_t i = 0; i < schedule.size(); i++)
                 {
-                    CronID_t cron_id = schedule[i]["cronId"];
+                    if (schedule[i]["id"] == schedule_message_id)
+                    {
+                        CronID_t id = schedule[i]["cronId"];
 
-                    Cron.free(cron_id);
-                    cron_id = dtINVALID_ALARM_ID;
-                    schedule.remove(i);
+                        Cron.free(id);
+                        schedule.remove(i);
 
-                    Serial.printf("schedule index ke-%d dihapus", i);
+                        Serial.printf("schedule index ke-%d dihapus", i);
 
-                    break;
+                        break;
+                    }
                 }
             }
-        }
-        else if (schedule_payload["type"] == "33") // edit schedule
-        {
-            for (size_t i = 0; i < schedule.size(); i++)
+            else if (schedule_message == "33")
             {
-                if (schedule[i]["id"] == schedule_payload["id"])
+                api_endpoint = String("http://mikiko.herokuapp.com/schedule/getedit/" + MACADD);
+
+                DynamicJsonDocument http_data_edit(128);
+                String string_http_data_edit;
+
+                http_data_edit["id"] = schedule_message_id;
+                serializeJson(http_data_edit, string_http_data_edit);
+
+                http.begin(scheduleClient, api_endpoint.c_str());
+                http.addHeader("Content-Type", "application/json");
+
+                if (http.POST(string_http_data_edit) > 0)
                 {
-                    CronID_t cron_id = schedule[i]["cronId"];
+                    http_data_edit.clear();
 
-                    Cron.free(cron_id);
-                    cron_id = dtINVALID_ALARM_ID;
-                    schedule.remove(i);
+                    deserializeJson(http_data_edit, http.getString().c_str());
 
-                    schedule_edit_check(schedule_payload);
+                    for (size_t i = 0; i < schedule.size(); i++)
+                    {
+                        if (schedule[i]["id"] == http_data_edit[0]["id"])
+                        {
+                            CronID_t id = schedule[i]["cronId"];
 
-                    break;
+                            Cron.free(id);
+                            schedule.remove(i);
+
+                            schedule_edit_check(http_data_edit);
+
+                            http_data_edit.clear();
+
+                            break;
+                        }
+                    }
                 }
+                else
+                {
+                    Serial.println("request error :");
+                }
+
+                http.end();
             }
         }
     }
