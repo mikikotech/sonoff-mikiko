@@ -22,6 +22,7 @@
 #define out4 15
 
 #define WIFI_LED 13
+// #define WIFI_LED 4
 
 Ticker ticker;
 WiFiUDP udp;
@@ -51,6 +52,8 @@ OneButton btn4 = OneButton(
     14,
     true,
     true);
+
+bool isLongPressed = false;
 
 String api_endpoint;
 CronId id;
@@ -127,19 +130,23 @@ String readStringFromFlash(int startAddr)
     return String(in);
 }
 
-void notif(String title, String msg)
+void notif(uint8_t index, uint8_t state, uint8_t type)
 {
 
-    DynamicJsonDocument notif_data(256);
+    DynamicJsonDocument notif_data(128);
     String string_notif_data;
 
-    notif_data["email"] = user;
-    notif_data["title"] = title;
-    notif_data["msg"] = msg;
+    api_endpoint = String("http://mikiko.herokuapp.com/notif/" + MACADD);
+
+    notif_data["type"] = type; // 1 schedule // 2 sensor
+    notif_data["index"] = index;
+    notif_data["state"] = state;
+
+    serializeJson(notif_data, Serial);
 
     serializeJson(notif_data, string_notif_data);
 
-    http.begin(http_notif, "http://mikiko.herokuapp.com/notif");
+    http.begin(http_notif, api_endpoint.c_str());
     http.addHeader("Content-Type", "application/json");
 
     if (http.POST(string_notif_data) > 0)
@@ -148,7 +155,7 @@ void notif(String title, String msg)
     }
     else
     {
-        Serial.println("error");
+        Serial.println("error notif");
     }
 
     http.end();
@@ -157,56 +164,56 @@ void notif(String title, String msg)
 void out1_on()
 {
     digitalWrite(out1, HIGH);
-    notif("schedule notif", "Switch 1 ON");
+    notif(0, 1, 1);
     client.publish(topic1.c_str(), "true", true);
 }
 
 void out1_off()
 {
     digitalWrite(out1, LOW);
-    notif("schedule notif", "Switch 1 OFF");
+    notif(0, 0, 1);
     client.publish(topic1.c_str(), "false", true);
 }
 
 void out2_on()
 {
     digitalWrite(out2, HIGH);
-    notif("schedule notif", "Switch 2 ON");
+    notif(1, 1, 1);
     client.publish(topic2.c_str(), "true", true);
 }
 
 void out2_off()
 {
     digitalWrite(out2, LOW);
-    notif("schedule notif", "Switch 2 OFF");
+    notif(1, 0, 1);
     client.publish(topic2.c_str(), "false", true);
 }
 
 void out3_on()
 {
     digitalWrite(out3, HIGH);
-    notif("schedule notif", "Switch 3 ON");
+    notif(2, 1, 1);
     client.publish(topic3.c_str(), "true", true);
 }
 
 void out3_off()
 {
     digitalWrite(out3, LOW);
-    notif("schedule notif", "Switch 3 OFF");
+    notif(2, 0, 1);
     client.publish(topic3.c_str(), "false", true);
 }
 
 void out4_on()
 {
     digitalWrite(out4, HIGH);
-    notif("schedule notif", "Switch 4 ON");
+    notif(3, 1, 1);
     client.publish(topic4.c_str(), "true", true);
 }
 
 void out4_off()
 {
     digitalWrite(out4, LOW);
-    notif("schedule notif", "Switch 4 OFF");
+    notif(3, 0, 1);
     client.publish(topic4.c_str(), "false", true);
 }
 
@@ -584,7 +591,7 @@ void schedule_edit_check(DynamicJsonDocument schedule_data)
 
 static void handleClick1()
 {
-    if (btn1.isLongPressed())
+    if (!isLongPressed)
     {
         int state = !digitalRead(out1);
         digitalWrite(out1, state);
@@ -773,12 +780,32 @@ static void wifi_led()
     digitalWrite(WIFI_LED, !digitalRead(WIFI_LED));
 }
 
+uint8_t count = 0;
+
+static void wifi_led_pairing()
+{
+    count++;
+
+    if (count > 5)
+    {
+        digitalWrite(WIFI_LED, HIGH);
+
+        if (count > 9)
+            count = 0;
+    }
+    else
+    {
+        digitalWrite(WIFI_LED, !digitalRead(WIFI_LED));
+    }
+}
+
 void btnLongPress()
 {
+    isLongPressed = true;
     writeStringToFlash("", 0);
+    writeStringToFlash("", 20);
     writeStringToFlash("", 40);
-    writeStringToFlash("", 80);
-    writeStringToFlash("", 85);
+    writeStringToFlash("", 45);
     ESP.restart();
 }
 
@@ -825,10 +852,6 @@ void reconnect_to_mqtt()
         Serial.print(client.state());
         delay(2000);
     }
-}
-
-void esp_local_control_handler()
-{
 }
 
 void setup()
@@ -880,12 +903,10 @@ void setup()
     schedule_topic = String("/" + String(MACADD) + "/data/schedule");
 
     ssid = readStringFromFlash(0);
-    pss = readStringFromFlash(40);
-    gmt = readStringFromFlash(80);
-    user = readStringFromFlash(85);
+    pss = readStringFromFlash(20);
+    gmt = readStringFromFlash(40);
+    user = readStringFromFlash(45);
     Serial.println(user);
-
-    ticker.attach(0.2, wifi_led);
 
     // WiFi.begin("Wifi saya", "1sampai9");
 
@@ -897,11 +918,13 @@ void setup()
     // Serial.println("CONNECTED to WIFI");
 
     // writeStringToFlash("", 0);
+    // writeStringToFlash("", 20);
     // writeStringToFlash("", 40);
-    // writeStringToFlash("", 80);
 
     if (ssid.length() > 0 && pss.length() > 0)
     {
+        ticker.attach(0.4, wifi_led);
+
         WiFi.begin(ssid.c_str(), pss.c_str());
 
         Serial.print("Connecting to WiFi ..");
@@ -917,6 +940,8 @@ void setup()
     }
     else
     {
+        ticker.attach(0.1, wifi_led_pairing);
+
         WiFi.mode(WIFI_STA);
 
         WiFi.beginSmartConfig();
@@ -956,9 +981,11 @@ void setup()
                 udp.read(udpbuf, 128);
                 Serial.print("message = ");
                 Serial.print(udpbuf);
-                // String udp_buf = String(udpbuf);
-                writeStringToFlash(getValue(String(udpbuf), 58, 0).c_str(), 80);
-                writeStringToFlash(getValue(String(udpbuf), 58, 1).c_str(), 85);
+                String udp_buf = String(udpbuf);
+                String gmt_buf = getValue(udp_buf, 58, 0);
+                String user_buf = getValue(udp_buf, 58, 1);
+                writeStringToFlash(gmt_buf.c_str(), 40);
+                writeStringToFlash(user_buf.c_str(), 45);
                 gmt = udpbuf;
                 Serial.print(", from =");
                 Serial.print(udp.remoteIP());
@@ -980,7 +1007,7 @@ void setup()
         pss = WiFi.psk();
 
         writeStringToFlash(ssid.c_str(), 0);
-        writeStringToFlash(pss.c_str(), 40);
+        writeStringToFlash(pss.c_str(), 20);
     }
 
     WiFi.setAutoReconnect(true);
