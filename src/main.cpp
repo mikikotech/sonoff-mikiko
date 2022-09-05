@@ -28,6 +28,7 @@ WiFiUDP udp;
 
 WiFiClient espClient;
 WiFiClient scheduleClient;
+WiFiClient http_notif;
 HTTPClient http;
 PubSubClient client(espClient);
 
@@ -128,8 +129,6 @@ String readStringFromFlash(int startAddr)
 
 void notif(String title, String msg)
 {
-
-    WiFiClient http_notif;
 
     DynamicJsonDocument notif_data(256);
     String string_notif_data;
