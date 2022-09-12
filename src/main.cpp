@@ -53,8 +53,6 @@ OneButton btn4 = OneButton(
     true,
     true);
 
-bool isLongPressed = false;
-
 String api_endpoint;
 CronId id;
 DynamicJsonDocument schedule(1024);
@@ -85,7 +83,7 @@ String fwUpdate_topic;
 String fwRespone_topic;
 String schedule_topic;
 
-char udpbuf[128];
+char udpbuf[3];
 
 static void wifi_led();
 
@@ -591,7 +589,7 @@ void schedule_edit_check(DynamicJsonDocument schedule_data)
 
 static void handleClick1()
 {
-    if (!isLongPressed)
+    if (!btn1.isLongPressed())
     {
         int state = !digitalRead(out1);
         digitalWrite(out1, state);
@@ -801,11 +799,9 @@ static void wifi_led_pairing()
 
 void btnLongPress()
 {
-    isLongPressed = true;
     writeStringToFlash("", 0);
     writeStringToFlash("", 20);
     writeStringToFlash("", 40);
-    writeStringToFlash("", 45);
     ESP.restart();
 }
 
@@ -905,8 +901,6 @@ void setup()
     ssid = readStringFromFlash(0);
     pss = readStringFromFlash(20);
     gmt = readStringFromFlash(40);
-    user = readStringFromFlash(45);
-    Serial.println(user);
 
     // WiFi.begin("Wifi saya", "1sampai9");
 
@@ -978,14 +972,10 @@ void setup()
             btn4.tick();
             if (udp.parsePacket())
             {
-                udp.read(udpbuf, 128);
+                udp.read(udpbuf, 3);
                 Serial.print("message = ");
                 Serial.print(udpbuf);
-                String udp_buf = String(udpbuf);
-                String gmt_buf = getValue(udp_buf, 58, 0);
-                String user_buf = getValue(udp_buf, 58, 1);
-                writeStringToFlash(gmt_buf.c_str(), 40);
-                writeStringToFlash(user_buf.c_str(), 45);
+                writeStringToFlash(udpbuf, 40);
                 gmt = udpbuf;
                 Serial.print(", from =");
                 Serial.print(udp.remoteIP());
